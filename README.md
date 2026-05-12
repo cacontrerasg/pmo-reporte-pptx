@@ -7,7 +7,34 @@ description: Genera la presentación mensual `Reporte de Avance de Proyectos Ban
 
 Skill para producir el PPT mensual del portafolio TI de Banreservas a partir del workbook Excel del PMO. La salida es un `.pptx` 16:9 con: 1 portada + 1 roadmap consolidado (Gantt) + N slides de detalle (uno por proyecto del Índice).
 
-> **Versión 2.0** — refinada con lecciones de la generación Mayo 2026.
+> **Versión 2.1** — refinada con lecciones de la generación Mayo 2026 e integración explícita con los skills de marca.
+
+---
+
+## Skills complementarios (cargar SIEMPRE antes de construir el PPT)
+
+Este skill **NO replica** la guía de marca ni el template institucional. Antes de empezar a generar slides, Claude DEBE invocar (`Skill`) los dos siguientes skills y aplicar lo que indiquen:
+
+1. **`banreservas-marca`** — guía completa de la marca Banreservas: paleta institucional, tipografía oficial, tono de voz, lineamientos de comunicación interna/externa, eslogan y reglas del logo. Úsalo para:
+   - Validar los colores aplicados (deben coincidir con la paleta oficial documentada por el skill, no con valores improvisados).
+   - Redactar el `eyebrow`, subtítulo y cualquier texto institucional en el tono Banreservas (cercano, profesional, claro).
+   - Verificar que el uso del nombre "Banreservas" y la mención a la Vicepresidencia Ejecutiva de Tecnología y Operaciones sea consistente.
+
+2. **`banreservas-pptx`** — skill de presentaciones PowerPoint con identidad Banreservas y acceso al template oficial. Úsalo para:
+   - **Punto de partida**: clonar/abrir el template oficial del banco como base del `.pptx` mensual (slide masters institucionales, theme de colores, layouts de portada/contenido/cierre). NUNCA generar el deck desde un `Presentation()` vacío si el template está disponible.
+   - Obtener el logo Banreservas como imagen (ubicado en los assets del skill) en vez de simular el logo con texto.
+   - Heredar los slide masters de portada y cierre institucional.
+   - Reutilizar layouts ya formateados con la marca cuando aplique.
+
+**Orden recomendado al iniciar:**
+
+```text
+1. Skill: banreservas-marca       (cargar guías de marca y tono)
+2. Skill: banreservas-pptx        (clonar template oficial)
+3. Skill: pmo-reporte-pptx        (este skill — lógica del reporte)
+```
+
+Si por alguna razón uno de los dos skills no está disponible, Claude debe avisarle al usuario antes de proseguir con valores fallback (paleta documentada en `references/branding.md`, logo simulado con texto). El output debería SIEMPRE tender al template oficial; las constantes locales son solo respaldo.
 
 ---
 
@@ -48,12 +75,13 @@ titulo_limpio = re.sub(r'^\d+\.\s*', '', valor_celda)
 
 ## Workflow de alto nivel
 
+0. **Cargar skills de marca.** Antes de tocar el Excel, invoca `banreservas-marca` y `banreservas-pptx` (ver §"Skills complementarios"). Esto fija la paleta, tono y template institucional.
 1. **Localizar el workbook del mes.** Carpeta `…/Gestión Proyectos Ti - Informe Mensual/{Mes} {Año}/`. El nombre del libro tiene el mes y año.
 2. **Leer la lista canónica de proyectos** desde la pestaña `Índice` (no del listado de pestañas). Extraer el nombre de la hoja real parseando la fórmula `='SheetName'!B3` en la columna correspondiente.
 3. **Por cada proyecto, extraer las celdas relevantes** (ver `references/excel-mapping.md` para el mapeo exacto).
 4. **Validar integridad** (B3 no vacío, fechas coherentes, % en [0,100]).
-5. **Aplicar resúmenes coherentes** a textos que excedan el límite de su columna (ver §"Resúmenes coherentes").
-6. **Construir el PPT** clonando el template del mes anterior o construyendo desde cero. Ver `references/layout.md` para el layout slide-a-slide.
+5. **Aplicar resúmenes coherentes** a textos que excedan el límite de su columna (ver §"Resúmenes coherentes"). El tono de los resúmenes debe respetar la guía de `banreservas-marca` (cercano, profesional, claro; sin tecnicismos innecesarios).
+6. **Construir el PPT** abriendo el template oficial expuesto por `banreservas-pptx` (preferido) o, como fallback, clonando el deck del mes anterior. Ver `references/layout.md` para el layout slide-a-slide. NUNCA partir de `Presentation()` vacío si el template oficial está disponible.
 7. **Eliminar filas/tarjetas vacías** del XML (usar `scripts/helpers.py`).
 8. **Reposicionar el bloque de Riesgos** dinámicamente con el algoritmo de `references/posicionamiento.md`.
 9. **Aplicar compresión** si el contenido no entra (font 7.5 pt, alturas reducidas).
@@ -122,9 +150,15 @@ Cuando necesites el detalle de una parte específica, lee la referencia correspo
 - **`references/excel-mapping.md`** — Estructura del workbook, mapeo celda→campo PPT, convenciones de hojas y del Índice. Léelo apenas necesites tocar el Excel.
 - **`references/layout.md`** — Layout slide-a-slide (portada, Gantt, detalle), coordenadas EMU, tablas, badges. Léelo cuando construyas slides.
 - **`references/posicionamiento.md`** — Algoritmo de posicionamiento dinámico del bloque Riesgos, alturas estimadas de fila, criterios de compresión. Léelo cuando ajustes layout denso.
-- **`references/branding.md`** — Paleta de colores oficial Banreservas, tipografía, constantes geométricas (EMU). Consúltala para cualquier color/tamaño.
+- **`references/branding.md`** — Paleta de colores oficial Banreservas, tipografía, constantes geométricas (EMU). **Fallback local**: el skill `banreservas-marca` es la fuente primaria; usa este archivo solo si el skill de marca no está cargado.
 - **`references/qa.md`** — Checklist final, validación programática de bordes, QA visual con subagente. Úsalo antes de entregar.
-- **`references/troubleshooting.md`** — Casos especiales: shapes off-screen del template viejo, hyperlinks rotos al renombrar pestañas, auto-fit de tablas, sheet name >31 chars. Consulta antes de improvisar.
+- **`references/troubleshooting.md`** — Casos especiales: shapes off-screen del template viejo, hyperlinks rotos al renombrar pestañas, auto-fit de tablas, sheet name >31 chars, normalización Unicode NFC/NFD al guardar en OneDrive/macOS. Consulta antes de improvisar.
+
+### Skills externos relacionados (cargarlos como Skill, no como Read)
+
+- **`banreservas-marca`** — guía de marca, paleta, tono de voz. **Cárgalo siempre al inicio.**
+- **`banreservas-pptx`** — template `.pptx` institucional con slide masters de portada, contenido y cierre, theme oficial y logo. **Cárgalo siempre al inicio.**
+- **`pptx`** (Anthropic, opcional) — utilidades genéricas de manipulación de PowerPoint. Útil para operaciones avanzadas (clonar slides, manipular XML) cuando los helpers locales de `scripts/helpers.py` no alcancen.
 
 ---
 
