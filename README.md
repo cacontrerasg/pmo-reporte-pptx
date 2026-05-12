@@ -1,13 +1,32 @@
 ---
 name: pmo-reporte-pptx
-description: Genera la presentación mensual `Reporte de Avance de Proyectos Banreservas {Mes} {Año}.pptx` a partir del Excel del PMO TI (Vicepresidencia Ejecutiva de Tecnología y Operaciones). SIEMPRE usa este skill cuando el usuario mencione "reporte de avance", "PPT de proyectos PMO", "presentación mensual de proyectos TI", "regenerar el PPT desde el Excel", "informe mensual de cartera", "roadmap consolidado de proyectos", "slides de detalle por proyecto", o cuando adjunte/referencie el archivo `Reporte de Avance de Proyectos PMO TI Banreservas - {Mes} {Año}.xlsx` y pida convertirlo a PowerPoint. También úsalo si el usuario pide actualizar fechas, regenerar el Gantt consolidado, ajustar el slide de un proyecto específico de la cartera, o aplicar las reglas de resumen coherente (sin elipsis) sobre textos de notas/riesgos del workbook mensual del PMO TI. Trabaja en conjunto con `banreservas-marca` y `banreservas-pptx` para la identidad visual.
+description: Genera el PPT mensual `Reporte de Avance de Proyectos Banreservas {Mes} {Año}.pptx` desde el Excel del PMO TI (VP Ejecutiva de Tecnología y Operaciones), replicando el modelo `assets/modelo-referencia.pptx` (Abril 2026 actualizado). Actívalo cuando el usuario diga "reporte de avance", "PPT del PMO", "presentación mensual de proyectos TI", "regenerar el PPT", "informe de cartera", "roadmap consolidado", "slide de detalle por proyecto", o adjunte/referencie `Reporte de Avance de Proyectos PMO TI Banreservas - {Mes} {Año}.xlsx`. También para actualizar fechas, regenerar el Gantt, ajustar un slide específico, o aplicar resúmenes coherentes (sin elipsis) en notas/riesgos. Trabaja con `banreservas-marca` (tono, paleta) y `banreservas-pptx` (template); el LAYOUT VINCULANTE sale de `references/modelo-referencia.md` y el archivo en `assets/`.
 ---
 
 # PMO TI · Generación del Reporte Mensual de Avance de Proyectos
 
 Skill para producir el PPT mensual del portafolio TI de Banreservas a partir del workbook Excel del PMO. La salida es un `.pptx` 16:9 con: 1 portada + 1 roadmap consolidado (Gantt) + N slides de detalle (uno por proyecto del Índice).
 
-> **Versión 2.1** — refinada con lecciones de la generación Mayo 2026 e integración explícita con los skills de marca.
+> **Versión 3.0** — incorpora `assets/modelo-referencia.pptx` (Reporte de Abril 2026 actualizado por Carlos el 8-may-2026) como **MODELO VINCULANTE** del que toda generación debe replicar layout, tipografía, secciones, colores, footer y decorativos.
+
+---
+
+## ⚠️ MODELO DE REFERENCIA VINCULANTE
+
+**Antes de generar nada, lee `references/modelo-referencia.md` y abre `assets/modelo-referencia.pptx`.**
+
+Este modelo es la fuente de verdad absoluta para el diseño del reporte mensual. Reglas duras:
+
+1. **Replica TODO del modelo**: layout, tipografía, paleta, posiciones, redacción de títulos de sección (`HITOS Y CRONOGRAMA`, `NOTAS GENERALES`, `RIESGOS Y PLAN DE MITIGACIÓN`), footer, casita ⌂ decorativa.
+2. **La caja superior tiene 4 columnas**: `ALCANCE · ESTATUS · SEGUIMIENTO · FECHA FIN`. NO incluyas `FECHA INICIO`.
+3. **Notas Generales** se renderizan con círculo verde sólido + texto, sin tarjeta de fondo.
+4. **Tablas sin alternancia de color** (todas las filas blancas).
+5. **Impacto en Riesgos** solo colorea el TEXTO, no la celda completa.
+6. **Footer**: `Versión: V1.0 · Dirección Senior de Proyectos TI · Confidencial — Uso Interno Banreservas · Fecha de reporte: dd/mm/yyyy` en itálica.
+7. **Portada sin eyebrow** institucional. Solo: título centrado + subtítulo + fecha + logo abajo-derecha.
+8. **No agregar slide de cierre azul** (Master5). El reporte termina en el último proyecto.
+
+Si una decisión de diseño no aparece en el modelo, consulta a Carlos antes de inventarla. Cualquier desviación del modelo debe estar explícitamente justificada por una indicación del usuario en la sesión actual.
 
 ---
 
@@ -75,13 +94,16 @@ titulo_limpio = re.sub(r'^\d+\.\s*', '', valor_celda)
 
 ## Workflow de alto nivel
 
-0. **Cargar skills de marca.** Antes de tocar el Excel, invoca `banreservas-marca` y `banreservas-pptx` (ver §"Skills complementarios"). Esto fija la paleta, tono y template institucional.
+0. **Cargar skills de marca y abrir el modelo.** Antes de tocar el Excel:
+   - Invoca `banreservas-marca` (paleta, tono) y `banreservas-pptx` (template oficial).
+   - Lee `references/modelo-referencia.md` para tener presentes todas las decisiones de diseño vinculantes.
+   - Si vas a comparar visualmente, abre `assets/modelo-referencia.pptx` (es el Reporte Abril 2026 actualizado).
 1. **Localizar el workbook del mes.** Carpeta `…/Gestión Proyectos Ti - Informe Mensual/{Mes} {Año}/`. El nombre del libro tiene el mes y año.
 2. **Leer la lista canónica de proyectos** desde la pestaña `Índice` (no del listado de pestañas). Extraer el nombre de la hoja real parseando la fórmula `='SheetName'!B3` en la columna correspondiente.
 3. **Por cada proyecto, extraer las celdas relevantes** (ver `references/excel-mapping.md` para el mapeo exacto).
 4. **Validar integridad** (B3 no vacío, fechas coherentes, % en [0,100]).
 5. **Aplicar resúmenes coherentes** a textos que excedan el límite de su columna (ver §"Resúmenes coherentes"). El tono de los resúmenes debe respetar la guía de `banreservas-marca` (cercano, profesional, claro; sin tecnicismos innecesarios).
-6. **Construir el PPT** abriendo el template oficial expuesto por `banreservas-pptx` (preferido) o, como fallback, clonando el deck del mes anterior. Ver `references/layout.md` para el layout slide-a-slide. NUNCA partir de `Presentation()` vacío si el template oficial está disponible.
+6. **Construir el PPT replicando el modelo.** Opción preferida: clonar `assets/modelo-referencia.pptx` y reemplazar contenidos slide por slide. Opción alternativa: partir del template oficial de `banreservas-pptx` y construir los slides siguiendo exactamente las especificaciones de `references/modelo-referencia.md`. **NUNCA** partir de `Presentation()` vacío. **NUNCA** introducir variaciones de layout no documentadas en el modelo.
 7. **Eliminar filas/tarjetas vacías** del XML (usar `scripts/helpers.py`).
 8. **Reposicionar el bloque de Riesgos** dinámicamente con el algoritmo de `references/posicionamiento.md`.
 9. **Aplicar compresión** si el contenido no entra (font 7.5 pt, alturas reducidas).
@@ -147,8 +169,10 @@ Cuando una sección entera está vacía, sustituir con un mensaje único centrad
 
 Cuando necesites el detalle de una parte específica, lee la referencia correspondiente. **No leas todas al inicio**: lee solo la que necesitas para la subtarea actual.
 
+- **`references/modelo-referencia.md`** — **(VINCULANTE)** Especificación exacta del PPT modelo (Abril 2026 actualizado). Lee esto **PRIMERO**, antes que cualquier otro reference. Toda decisión de diseño debe alinearse a este documento.
+- **`assets/modelo-referencia.pptx`** — Archivo binario del modelo. Úsalo como base para clonar y reemplazar, o ábrelo en LibreOffice para verificar coordenadas exactas.
 - **`references/excel-mapping.md`** — Estructura del workbook, mapeo celda→campo PPT, convenciones de hojas y del Índice. Léelo apenas necesites tocar el Excel.
-- **`references/layout.md`** — Layout slide-a-slide (portada, Gantt, detalle), coordenadas EMU, tablas, badges. Léelo cuando construyas slides.
+- **`references/layout.md`** — Layout slide-a-slide histórico. **Donde haya conflicto con `modelo-referencia.md`, gana el modelo.**
 - **`references/posicionamiento.md`** — Algoritmo de posicionamiento dinámico del bloque Riesgos, alturas estimadas de fila, criterios de compresión. Léelo cuando ajustes layout denso.
 - **`references/branding.md`** — Paleta de colores oficial Banreservas, tipografía, constantes geométricas (EMU). **Fallback local**: el skill `banreservas-marca` es la fuente primaria; usa este archivo solo si el skill de marca no está cargado.
 - **`references/qa.md`** — Checklist final, validación programática de bordes, QA visual con subagente. Úsalo antes de entregar.
