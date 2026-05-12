@@ -1,0 +1,65 @@
+# QA y validación
+
+Antes de entregar el `.pptx` a Carlos, ejecutar tres pasos: validación programática, QA visual con subagente y checklist final.
+
+---
+
+## 1. Validación programática (bordes)
+
+Asegura que ningún shape se sale del slide. Tolerancia: ±1 EMU/9525.
+
+```python
+SLIDE_W = 12192000  # EMU absolutos
+SLIDE_H = 6858000
+
+for slide_idx, slide in enumerate(prs.slides, start=1):
+    for shape in slide.shapes:
+        right = shape.left + shape.width
+        bottom = shape.top + shape.height
+        assert right <= SLIDE_W + 9525, f"Slide {slide_idx} · {shape.name} se sale a la derecha"
+        assert bottom <= SLIDE_H + 9525, f"Slide {slide_idx} · {shape.name} se sale abajo"
+        assert shape.left >= -9525, f"Slide {slide_idx} · {shape.name} sale a la izquierda"
+        assert shape.top >= -9525, f"Slide {slide_idx} · {shape.name} sale arriba"
+```
+
+---
+
+## 2. QA visual con subagente
+
+Convertir a PDF con LibreOffice, exportar a JPG con poppler, lanzar un subagente para inspección.
+
+```bash
+soffice --headless --convert-to pdf "Reporte de Avance de Proyectos Banreservas {Mes} {Año}.pptx"
+pdftoppm -jpeg -r 80 "Reporte de Avance de Proyectos Banreservas {Mes} {Año}.pdf" slide
+```
+
+**Prompt para el subagente de inspección:**
+
+> Inspecciona estas N imágenes (slides exportadas). Para cada slide reporta SOLO defectos visibles para el usuario:
+>
+> 1. Contenido pasando el borde del slide.
+> 2. Tablas/títulos solapando con otra sección.
+> 3. Apariciones de `...`, `…` o elipsis en cualquier texto.
+> 4. Filas vacías o tarjetas vacías.
+>
+> Formato: `Slide N: OK` ó `Slide N: <issue específico>`.
+
+---
+
+## 3. Checklist final
+
+Antes de declarar la entrega completa, valida:
+
+- [ ] **Portada:** título centrado, logo visible, fecha del mes correcto.
+- [ ] **Gantt:** línea naranja "Hoy" alineada con la fecha de corte, % labels legibles, todos los proyectos del Índice listados.
+- [ ] **Cada detalle:** `ProjName` desde `B3`, no truncado, sin `[SIN TÍTULO]`.
+- [ ] **Caja superior:** 5 columnas visibles (ALCANCE, ESTATUS, BADGE, F.INICIO, F.FIN).
+- [ ] **Tablas Entregables:** sin filas vacías (header siempre presente).
+- [ ] **Tablas Riesgos:** sin filas vacías; o el fallback "No hay riesgo para este mes" si la sección está totalmente vacía.
+- [ ] **Notas:** sin tarjetas vacías; máximo 4.
+- [ ] **Sin elipsis:** ninguna aparición de `...` ni `…` en todo el documento.
+- [ ] **Sin sobreposición:** Entregables ↔ Riesgos no se solapan.
+- [ ] **Sin desbordamiento:** ningún shape pasa el footer (T=690 EMU/9525).
+- [ ] **Footer:** versión, autor, confidencial, fecha del mes correcto.
+
+Si alguna falla, vuelve a la etapa que corresponda — no entregues con defectos visibles.
